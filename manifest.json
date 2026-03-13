@@ -2,7 +2,7 @@
   "name": "MyDay",
   "short_name": "MyDay",
   "description": "Личный планировщик — Канбан доска",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
