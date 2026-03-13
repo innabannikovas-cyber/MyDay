@@ -176,9 +176,19 @@
       min-height: 48px;
     }
 
-    .cards-list.drag-over {
-      background: rgba(99,102,241,0.06);
+    .cards-list.drag-over,
+    .column.drag-over .cards-list {
+      background: rgba(99,102,241,0.08);
       border-radius: var(--radius-sm);
+    }
+
+    .column.drag-over {
+      outline: 2px dashed var(--accent);
+      outline-offset: -2px;
+    }
+
+    .board-wrap.dragging {
+      scroll-snap-type: none;
     }
 
     /* ── Card ── */
@@ -547,10 +557,10 @@ function buildColumn(col) {
     });
   }
 
-  // Drop zone
-  list.addEventListener('dragover', onDragOver);
-  list.addEventListener('dragleave', onDragLeave);
-  list.addEventListener('drop', e => onDrop(e, col.id));
+  // Drop zone — entire column is a drop target
+  wrap.addEventListener('dragover', onDragOver);
+  wrap.addEventListener('dragleave', onDragLeave);
+  wrap.addEventListener('drop', e => onDrop(e, col.id));
 
   return wrap;
 }
@@ -670,11 +680,15 @@ function onDragStart(e, cardId) {
   dragCardId = cardId;
   e.dataTransfer.setData('text/plain', cardId);
   e.dataTransfer.effectAllowed = 'move';
-  requestAnimationFrame(() => e.target.classList.add('dragging'));
+  requestAnimationFrame(() => {
+    e.target.classList.add('dragging');
+    document.getElementById('board').classList.add('dragging');
+  });
 }
 
 function onDragEnd(e) {
   e.target.classList.remove('dragging');
+  document.getElementById('board').classList.remove('dragging');
   document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
   removePlaceholder();
   dragCardId = null;
@@ -682,19 +696,26 @@ function onDragEnd(e) {
 
 function onDragOver(e) {
   e.preventDefault();
+  e.stopPropagation();
   e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
+  // Highlight the column
+  const col = e.currentTarget.closest('.column') || e.currentTarget;
+  document.querySelectorAll('.column.drag-over').forEach(el => el.classList.remove('drag-over'));
+  col.classList.add('drag-over');
 }
 
 function onDragLeave(e) {
-  if (!e.currentTarget.contains(e.relatedTarget)) {
-    e.currentTarget.classList.remove('drag-over');
+  const col = e.currentTarget;
+  if (!col.contains(e.relatedTarget)) {
+    col.classList.remove('drag-over');
   }
 }
 
 function onDrop(e, destColId) {
   e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
+  e.stopPropagation();
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  document.getElementById('board').classList.remove('dragging');
   removePlaceholder();
 
   const cardId = e.dataTransfer.getData('text/plain') || dragCardId;
@@ -703,8 +724,8 @@ function onDrop(e, destColId) {
   const card = state.cards.find(c => c.id === cardId);
   if (!card) return;
 
-  // Update column
   card.col = destColId;
+  dragCardId = null;
 
   saveState();
   render();
