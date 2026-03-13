@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MyDay</title>
+  <meta name="description" content="Личный планировщик — Канбан доска" />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MyDay" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #263144;
+      --border: #334155;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --text: #f1f5f9;
+      --text2: #94a3b8;
+      --text3: #64748b;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --green: #22c55e;
+      --col-todo: #6366f1;
+      --col-doing: #f59e0b;
+      --col-done: #22c55e;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overscroll-behavior: none;
+    }
+
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      padding: env(safe-area-inset-top, 0) 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .date-badge {
+      font-size: 13px;
+      color: var(--text2);
+      background: var(--surface);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Board layout ── */
+    .board-wrap {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      overflow-x: auto;
+      min-height: calc(100vh - 57px);
+      align-items: flex-start;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    }
+
+    /* ── Column ── */
+    .column {
+      flex: 0 0 280px;
+      scroll-snap-align: start;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 90px);
+    }
+
+    .col-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .col-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .col-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .col-count {
+      background: var(--surface2);
+      color: var(--text2);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .col-add-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: var(--surface2);
+      color: var(--text2);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .col-add-btn:hover { background: var(--accent); color: white; }
+
+    /* ── Cards list ── */
+    .cards-list {
+      padding: 10px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 48px;
+    }
+
+    .cards-list.drag-over {
+      background: rgba(99,102,241,0.06);
+      border-radius: var(--radius-sm);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 12px 10px;
+      cursor: grab;
+      user-select: none;
+      transition: box-shadow 0.15s, transform 0.15s, opacity 0.15s;
+      position: relative;
+    }
+
+    .card:active { cursor: grabbing; }
+    .card.dragging { opacity: 0.4; }
+    .card.drag-placeholder {
+      border: 2px dashed var(--accent);
+      background: rgba(99,102,241,0.08);
+      min-height: 64px;
+    }
+
+    .card-priority {
+      width: 3px;
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      border-radius: 3px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      padding-left: 8px;
+      word-break: break-word;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 6px;
+      padding-left: 8px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-left: 8px;
+    }
+
+    .card-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .card:hover .card-actions { opacity: 1; }
+
+    .card-btn {
+      width: 26px;
+      height: 26px;
+      border: none;
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .card-btn:hover { background: var(--border); color: var(--text); }
+    .card-btn.del:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 24px 16px;
+      color: var(--text3);
+      font-size: 13px;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius) var(--radius) 0 0;
+      width: 100%;
+      max-width: 520px;
+      padding: 24px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+      transform: translateY(40px);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border: 1px solid var(--border);
+      border-bottom: none;
+    }
+    .modal-overlay.open .modal {
+      transform: translateY(0);
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 15px;
+      padding: 10px 12px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus,
+    textarea:focus,
+    select:focus { border-color: var(--accent); }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    select option { background: var(--surface2); }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface2); color: var(--text2); }
+
+    /* ── Priority colors ── */
+    .p-high   { background: var(--red); }
+    .p-medium { background: var(--yellow); }
+    .p-low    { background: var(--green); }
+
+    /* ── Tag colors ── */
+    .tag-work    { background: rgba(99,102,241,0.2);  color: var(--accent2); }
+    .tag-personal{ background: rgba(34,197,94,0.2);   color: #4ade80; }
+    .tag-health  { background: rgba(249,115,22,0.2);  color: #fb923c; }
+    .tag-home    { background: rgba(20,184,166,0.2);  color: #2dd4bf; }
+    .tag-other   { background: rgba(148,163,184,0.2); color: var(--text2); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    @media (min-width: 600px) {
+      .board-wrap { padding: 20px 24px; gap: 16px; }
+      .column { flex: 0 0 300px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">✦</div>
+      MyDay
+    </div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+</header>
+
+<main class="board-wrap" id="board"></main>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Новая задача</div>
+    <form id="cardForm" autocomplete="off">
+      <div class="form-group">
+        <label>Задача *</label>
+        <input type="text" id="fTitle" placeholder="Что нужно сделать?" maxlength="200" required />
+      </div>
+      <div class="form-group">
+        <label>Описание</label>
+        <textarea id="fDesc" placeholder="Детали, ссылки…" maxlength="500"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Колонка</label>
+          <select id="fCol">
+            <option value="todo">Надо сделать</option>
+            <option value="doing">В процессе</option>
+            <option value="done">Готово</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Приоритет</label>
+          <select id="fPriority">
+            <option value="medium">Средний</option>
+            <option value="high">Высокий</option>
+            <option value="low">Низкий</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Тег</label>
+        <select id="fTag">
+          <option value="other">Без тега</option>
+          <option value="work">Работа</option>
+          <option value="personal">Личное</option>
+          <option value="health">Здоровье</option>
+          <option value="home">Дом</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="modalCancel">Отмена</button>
+        <button type="submit" class="btn btn-primary" id="modalSave">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const STORE_KEY = 'myday_board';
+
+const COLUMNS = [
+  { id: 'todo',  label: 'Надо сделать', color: '#6366f1' },
+  { id: 'doing', label: 'В процессе',   color: '#f59e0b' },
+  { id: 'done',  label: 'Готово',       color: '#22c55e' }
+];
+
+const TAG_LABELS = {
+  work: 'Работа', personal: 'Личное',
+  health: 'Здоровье', home: 'Дом', other: ''
+};
+
+let state = loadState();
+let editingId = null;
+let dragSrcCol = null;
+let dragSrcIdx = null;
+let placeholder = null;
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (s && s.cards) return s;
+  } catch {}
+  return { cards: [] };
+}
+
+function saveState() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function cardsFor(colId) {
+  return state.cards.filter(c => c.col === colId);
+}
+
+// ── Date badge ────────────────────────────────────────────────────────────
+function updateDate() {
+  const now = new Date();
+  const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+  document.getElementById('dateBadge').textContent =
+    now.toLocaleDateString('ru-RU', opts);
+}
+updateDate();
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  COLUMNS.forEach(col => {
+    board.appendChild(buildColumn(col));
+  });
+}
+
+function buildColumn(col) {
+  const cards = cardsFor(col.id);
+  const wrap = document.createElement('div');
+  wrap.className = 'column';
+  wrap.dataset.col = col.id;
+
+  wrap.innerHTML = `
+    <div class="col-header">
+      <div class="col-title">
+        <span class="col-dot" style="background:${col.color}"></span>
+        ${col.label}
+        <span class="col-count">${cards.length}</span>
+      </div>
+      <button class="col-add-btn" data-col="${col.id}" title="Добавить задачу">+</button>
+    </div>
+    <div class="cards-list" id="list-${col.id}"></div>
+  `;
+
+  wrap.querySelector('.col-add-btn').addEventListener('click', () => openModal(null, col.id));
+
+  const list = wrap.querySelector('.cards-list');
+  if (cards.length === 0) {
+    list.innerHTML = '<div class="empty-state">Нет задач</div>';
+  } else {
+    cards.forEach((card, idx) => {
+      list.appendChild(buildCard(card, idx));
+    });
+  }
+
+  // Drop zone
+  list.addEventListener('dragover', onDragOver);
+  list.addEventListener('dragleave', onDragLeave);
+  list.addEventListener('drop', e => onDrop(e, col.id));
+
+  return wrap;
+}
+
+function buildCard(card, idx) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.draggable = true;
+  el.dataset.id = card.id;
+  el.dataset.idx = idx;
+
+  const tagLabel = TAG_LABELS[card.tag] || '';
+  const tagHtml = tagLabel
+    ? `<span class="card-tag tag-${card.tag}">${tagLabel}</span>`
+    : '<span></span>';
+
+  el.innerHTML = `
+    <span class="card-priority p-${card.priority}"></span>
+    <div class="card-title">${escHtml(card.title)}</div>
+    ${card.desc ? `<div class="card-desc">${escHtml(card.desc)}</div>` : ''}
+    <div class="card-footer">
+      ${tagHtml}
+      <div class="card-actions">
+        <button class="card-btn edit" title="Редактировать">✏️</button>
+        <button class="card-btn del" title="Удалить">🗑</button>
+      </div>
+    </div>
+  `;
+
+  el.querySelector('.edit').addEventListener('click', e => {
+    e.stopPropagation();
+    openModal(card.id);
+  });
+  el.querySelector('.del').addEventListener('click', e => {
+    e.stopPropagation();
+    deleteCard(card.id);
+  });
+
+  el.addEventListener('dragstart', e => onDragStart(e, card.col, idx));
+  el.addEventListener('dragend', onDragEnd);
+
+  return el;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+          .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+function openModal(cardId, defaultCol = 'todo') {
+  editingId = cardId;
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('modalTitle').textContent =
+    cardId ? 'Редактировать задачу' : 'Новая задача';
+
+  if (cardId) {
+    const c = state.cards.find(x => x.id === cardId);
+    document.getElementById('fTitle').value = c.title;
+    document.getElementById('fDesc').value = c.desc || '';
+    document.getElementById('fCol').value = c.col;
+    document.getElementById('fPriority').value = c.priority;
+    document.getElementById('fTag').value = c.tag;
+  } else {
+    document.getElementById('cardForm').reset();
+    document.getElementById('fCol').value = defaultCol;
+  }
+
+  overlay.classList.add('open');
+  setTimeout(() => document.getElementById('fTitle').focus(), 250);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+document.getElementById('cardForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const title = document.getElementById('fTitle').value.trim();
+  if (!title) return;
+
+  const data = {
+    title,
+    desc: document.getElementById('fDesc').value.trim(),
+    col: document.getElementById('fCol').value,
+    priority: document.getElementById('fPriority').value,
+    tag: document.getElementById('fTag').value
+  };
+
+  if (editingId) {
+    const idx = state.cards.findIndex(c => c.id === editingId);
+    state.cards[idx] = { ...state.cards[idx], ...data };
+  } else {
+    state.cards.push({ id: uid(), ...data });
+  }
+
+  saveState();
+  render();
+  closeModal();
+});
+
+// ── Delete ────────────────────────────────────────────────────────────────
+function deleteCard(id) {
+  state.cards = state.cards.filter(c => c.id !== id);
+  saveState();
+  render();
+}
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────
+function onDragStart(e, colId, idx) {
+  dragSrcCol = colId;
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  removePlaceholder();
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const list = e.currentTarget;
+  list.classList.add('drag-over');
+
+  const afterEl = getDragAfterElement(list, e.clientY);
+  removePlaceholder();
+  placeholder = document.createElement('div');
+  placeholder.className = 'card drag-placeholder';
+
+  if (afterEl) {
+    list.insertBefore(placeholder, afterEl);
+  } else {
+    // Remove empty-state if present
+    const empty = list.querySelector('.empty-state');
+    if (empty) empty.remove();
+    list.appendChild(placeholder);
+  }
+}
+
+function onDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function onDrop(e, destColId) {
+  e.preventDefault();
+  const list = e.currentTarget;
+  list.classList.remove('drag-over');
+  removePlaceholder();
+
+  if (dragSrcCol === null) return;
+
+  const srcCards = cardsFor(dragSrcCol);
+  const card = srcCards[dragSrcIdx];
+  if (!card) return;
+
+  // Remove from source
+  state.cards = state.cards.filter(c => c.id !== card.id);
+
+  // Find drop position
+  const afterEl = getDragAfterElement(list, e.clientY);
+  let destIdx;
+  if (afterEl) {
+    const afterId = afterEl.dataset.id;
+    const destCards = cardsFor(destColId);
+    destIdx = destCards.findIndex(c => c.id === afterId);
+  } else {
+    destIdx = cardsFor(destColId).length;
+  }
+
+  // Update column
+  card.col = destColId;
+
+  // Insert at correct position in global array
+  const allDestCards = state.cards.filter(c => c.col === destColId);
+  const firstDestIdx = state.cards.findIndex(c => c.col === destColId);
+
+  if (firstDestIdx === -1) {
+    state.cards.push(card);
+  } else {
+    const insertPos = firstDestIdx + destIdx;
+    state.cards.splice(insertPos, 0, card);
+  }
+
+  saveState();
+  render();
+}
+
+function getDragAfterElement(list, y) {
+  const els = [...list.querySelectorAll('.card:not(.dragging):not(.drag-placeholder)')];
+  return els.reduce((closest, el) => {
+    const rect = el.getBoundingClientRect();
+    const offset = y - rect.top - rect.height / 2;
+    if (offset < 0 && offset > closest.offset) return { offset, el };
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).el;
+}
+
+function removePlaceholder() {
+  if (placeholder && placeholder.parentNode) placeholder.remove();
+  placeholder = null;
+}
+
+// ── Touch drag (basic support) ────────────────────────────────────────────
+// Long-press → move for mobile
+let touchCard = null;
+let touchClone = null;
+let touchStartX = 0, touchStartY = 0;
+
+document.addEventListener('touchstart', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  const timer = setTimeout(() => {
+    touchCard = card;
+    touchClone = card.cloneNode(true);
+    touchClone.style.cssText = `
+      position:fixed; z-index:999; opacity:0.85; pointer-events:none;
+      width:${card.offsetWidth}px; top:${card.getBoundingClientRect().top}px;
+      left:${card.getBoundingClientRect().left}px;
+      transform:rotate(2deg); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    `;
+    document.body.appendChild(touchClone);
+    card.style.opacity = '0.3';
+  }, 400);
+  card._touchTimer = timer;
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  const card = e.target.closest('.card');
+  if (card && card._touchTimer) { clearTimeout(card._touchTimer); }
+  if (!touchCard || !touchClone) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = touchCard.getBoundingClientRect();
+  touchClone.style.top  = (t.clientY - rect.height / 2) + 'px';
+  touchClone.style.left = (t.clientX - rect.width / 2) + 'px';
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  const card = e.target.closest('.card');
+  if (card && card._touchTimer) clearTimeout(card._touchTimer);
+  if (!touchCard || !touchClone) return;
+
+  const t = e.changedTouches[0];
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const destList = el && el.closest('.cards-list');
+
+  touchCard.style.opacity = '';
+  touchClone.remove();
+
+  if (destList) {
+    const colEl = destList.closest('.column');
+    const destColId = colEl && colEl.dataset.col;
+    if (destColId) {
+      const srcColId = touchCard.closest('.column').dataset.col;
+      const srcIdx = parseInt(touchCard.dataset.idx, 10);
+      const srcCards = cardsFor(srcColId);
+      const card = srcCards[srcIdx];
+      if (card) {
+        state.cards = state.cards.filter(c => c.id !== card.id);
+        card.col = destColId;
+        state.cards.push(card);
+        saveState();
+        render();
+      }
+    }
+  }
+
+  touchCard = null;
+  touchClone = null;
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+render();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
