@@ -27,12 +27,8 @@
       --red: #ef4444;
       --yellow: #f59e0b;
       --green: #22c55e;
-      --col-todo: #6366f1;
-      --col-doing: #f59e0b;
-      --col-done: #22c55e;
       --radius: 12px;
       --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.4);
     }
 
     html, body {
@@ -80,6 +76,12 @@
       font-size: 16px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .date-badge {
       font-size: 13px;
       color: var(--text2);
@@ -88,6 +90,23 @@
       border-radius: 20px;
       border: 1px solid var(--border);
     }
+
+    .sync-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: var(--surface);
+      color: var(--text2);
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border: 1px solid var(--border);
+      transition: background 0.15s, color 0.15s;
+    }
+    .sync-btn:hover { background: var(--accent); color: white; }
 
     /* ── Board layout ── */
     .board-wrap {
@@ -98,20 +117,24 @@
       min-height: calc(100vh - 57px);
       align-items: flex-start;
       -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x mandatory;
       padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
     }
 
     /* ── Column ── */
     .column {
       flex: 0 0 280px;
-      scroll-snap-align: start;
       background: var(--surface);
       border-radius: var(--radius);
       border: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       max-height: calc(100vh - 90px);
+      transition: outline 0.15s;
+    }
+
+    .column.drag-over {
+      outline: 2px dashed var(--accent);
+      outline-offset: -2px;
     }
 
     .col-header {
@@ -176,19 +199,9 @@
       min-height: 48px;
     }
 
-    .cards-list.drag-over,
     .column.drag-over .cards-list {
-      background: rgba(99,102,241,0.08);
+      background: rgba(99,102,241,0.06);
       border-radius: var(--radius-sm);
-    }
-
-    .column.drag-over {
-      outline: 2px dashed var(--accent);
-      outline-offset: -2px;
-    }
-
-    .board-wrap.dragging {
-      scroll-snap-type: none;
     }
 
     /* ── Card ── */
@@ -204,12 +217,7 @@
     }
 
     .card:active { cursor: grabbing; }
-    .card.dragging { opacity: 0.4; }
-    .card.drag-placeholder {
-      border: 2px dashed var(--accent);
-      background: rgba(99,102,241,0.08);
-      min-height: 64px;
-    }
+    .card.dragging { opacity: 0.3; transform: scale(0.95); }
 
     .card-priority {
       width: 3px;
@@ -324,9 +332,7 @@
       margin-bottom: 20px;
     }
 
-    .form-group {
-      margin-bottom: 14px;
-    }
+    .form-group { margin-bottom: 14px; }
 
     label {
       display: block;
@@ -350,12 +356,8 @@
       font-family: inherit;
       transition: border-color 0.15s;
     }
-    input[type="text"]:focus,
-    textarea:focus,
-    select:focus { border-color: var(--accent); }
-
+    input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--accent); }
     textarea { resize: vertical; min-height: 80px; }
-
     select option { background: var(--surface2); }
 
     .form-row {
@@ -383,6 +385,56 @@
     .btn:hover { opacity: 0.85; }
     .btn-primary { background: var(--accent); color: white; }
     .btn-ghost { background: var(--surface2); color: var(--text2); }
+
+    /* ── Sync modal ── */
+    .sync-code {
+      width: 100%;
+      min-height: 100px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--accent2);
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      word-break: break-all;
+      resize: none;
+    }
+
+    .sync-info {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .sync-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--accent);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 999;
+      pointer-events: none;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
 
     /* ── Priority colors ── */
     .p-high   { background: var(--red); }
@@ -412,10 +464,13 @@
 <header>
   <div class="header-inner">
     <div class="logo">
-      <div class="logo-icon">✦</div>
+      <div class="logo-icon">&#10022;</div>
       MyDay
     </div>
-    <div class="date-badge" id="dateBadge"></div>
+    <div class="header-right">
+      <div class="date-badge" id="dateBadge"></div>
+      <button class="sync-btn" id="syncBtn" title="&#1057;&#1080;&#1085;&#1093;&#1088;&#1086;&#1085;&#1080;&#1079;&#1072;&#1094;&#1080;&#1103;">&#8645;</button>
+    </div>
   </div>
 </header>
 
@@ -424,71 +479,91 @@
 <!-- Add/Edit Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <div class="modal-title" id="modalTitle">Новая задача</div>
+    <div class="modal-title" id="modalTitle">&#1053;&#1086;&#1074;&#1072;&#1103; &#1079;&#1072;&#1076;&#1072;&#1095;&#1072;</div>
     <form id="cardForm" autocomplete="off">
       <div class="form-group">
-        <label>Задача *</label>
-        <input type="text" id="fTitle" placeholder="Что нужно сделать?" maxlength="200" required />
+        <label>&#1047;&#1072;&#1076;&#1072;&#1095;&#1072; *</label>
+        <input type="text" id="fTitle" placeholder="&#1063;&#1090;&#1086; &#1085;&#1091;&#1078;&#1085;&#1086; &#1089;&#1076;&#1077;&#1083;&#1072;&#1090;&#1100;?" maxlength="200" required />
       </div>
       <div class="form-group">
-        <label>Описание</label>
-        <textarea id="fDesc" placeholder="Детали, ссылки…" maxlength="500"></textarea>
+        <label>&#1054;&#1087;&#1080;&#1089;&#1072;&#1085;&#1080;&#1077;</label>
+        <textarea id="fDesc" placeholder="&#1044;&#1077;&#1090;&#1072;&#1083;&#1080;, &#1089;&#1089;&#1099;&#1083;&#1082;&#1080;&#8230;" maxlength="500"></textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Колонка</label>
+          <label>&#1050;&#1086;&#1083;&#1086;&#1085;&#1082;&#1072;</label>
           <select id="fCol">
-            <option value="todo">Надо сделать</option>
-            <option value="doing">В процессе</option>
-            <option value="done">Готово</option>
+            <option value="todo">&#1053;&#1072;&#1076;&#1086; &#1089;&#1076;&#1077;&#1083;&#1072;&#1090;&#1100;</option>
+            <option value="doing">&#1042; &#1087;&#1088;&#1086;&#1094;&#1077;&#1089;&#1089;&#1077;</option>
+            <option value="done">&#1043;&#1086;&#1090;&#1086;&#1074;&#1086;</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Приоритет</label>
+          <label>&#1055;&#1088;&#1080;&#1086;&#1088;&#1080;&#1090;&#1077;&#1090;</label>
           <select id="fPriority">
-            <option value="medium">Средний</option>
-            <option value="high">Высокий</option>
-            <option value="low">Низкий</option>
+            <option value="medium">&#1057;&#1088;&#1077;&#1076;&#1085;&#1080;&#1081;</option>
+            <option value="high">&#1042;&#1099;&#1089;&#1086;&#1082;&#1080;&#1081;</option>
+            <option value="low">&#1053;&#1080;&#1079;&#1082;&#1080;&#1081;</option>
           </select>
         </div>
       </div>
       <div class="form-group">
-        <label>Тег</label>
+        <label>&#1058;&#1077;&#1075;</label>
         <select id="fTag">
-          <option value="other">Без тега</option>
-          <option value="work">Работа</option>
-          <option value="personal">Личное</option>
-          <option value="health">Здоровье</option>
-          <option value="home">Дом</option>
+          <option value="other">&#1041;&#1077;&#1079; &#1090;&#1077;&#1075;&#1072;</option>
+          <option value="work">&#1056;&#1072;&#1073;&#1086;&#1090;&#1072;</option>
+          <option value="personal">&#1051;&#1080;&#1095;&#1085;&#1086;&#1077;</option>
+          <option value="health">&#1047;&#1076;&#1086;&#1088;&#1086;&#1074;&#1100;&#1077;</option>
+          <option value="home">&#1044;&#1086;&#1084;</option>
         </select>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" id="modalCancel">Отмена</button>
-        <button type="submit" class="btn btn-primary" id="modalSave">Сохранить</button>
+        <button type="button" class="btn btn-ghost" id="modalCancel">&#1054;&#1090;&#1084;&#1077;&#1085;&#1072;</button>
+        <button type="submit" class="btn btn-primary" id="modalSave">&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100;</button>
       </div>
     </form>
   </div>
 </div>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="syncOverlay">
+  <div class="modal">
+    <div class="modal-title">&#1057;&#1080;&#1085;&#1093;&#1088;&#1086;&#1085;&#1080;&#1079;&#1072;&#1094;&#1080;&#1103;</div>
+    <div class="sync-info">
+      &#1063;&#1090;&#1086;&#1073;&#1099; &#1087;&#1077;&#1088;&#1077;&#1085;&#1077;&#1089;&#1090;&#1080; &#1079;&#1072;&#1076;&#1072;&#1095;&#1080; &#1085;&#1072; &#1076;&#1088;&#1091;&#1075;&#1086;&#1077; &#1091;&#1089;&#1090;&#1088;&#1086;&#1081;&#1089;&#1090;&#1074;&#1086;:<br/>
+      1. &#1053;&#1072;&#1078;&#1084;&#1080; <b>&#171;&#1050;&#1086;&#1087;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100;&#187;</b> &#8212; &#1082;&#1086;&#1076; &#1087;&#1086;&#1087;&#1072;&#1076;&#1105;&#1090; &#1074; &#1073;&#1091;&#1092;&#1077;&#1088;<br/>
+      2. &#1054;&#1090;&#1087;&#1088;&#1072;&#1074;&#1100; &#1089;&#1077;&#1073;&#1077; &#1074; &#1084;&#1077;&#1089;&#1089;&#1077;&#1085;&#1076;&#1078;&#1077;&#1088;<br/>
+      3. &#1053;&#1072; &#1076;&#1088;&#1091;&#1075;&#1086;&#1084; &#1091;&#1089;&#1090;&#1088;&#1086;&#1081;&#1089;&#1090;&#1074;&#1077; &#1074;&#1089;&#1090;&#1072;&#1074;&#1100; &#1082;&#1086;&#1076; &#1080; &#1085;&#1072;&#1078;&#1084;&#1080; <b>&#171;&#1047;&#1072;&#1075;&#1088;&#1091;&#1079;&#1080;&#1090;&#1100;&#187;</b>
+    </div>
+    <textarea class="sync-code" id="syncCode" placeholder="&#1042;&#1089;&#1090;&#1072;&#1074;&#1100; &#1082;&#1086;&#1076; &#1089;&#1102;&#1076;&#1072; &#1076;&#1083;&#1103; &#1079;&#1072;&#1075;&#1088;&#1091;&#1079;&#1082;&#1080;..."></textarea>
+    <div class="sync-buttons">
+      <button class="btn btn-primary" id="syncCopy">&#1050;&#1086;&#1087;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100;</button>
+      <button class="btn btn-primary" id="syncLoad" style="background:var(--green)">&#1047;&#1072;&#1075;&#1088;&#1091;&#1079;&#1080;&#1090;&#1100;</button>
+      <button class="btn btn-ghost" id="syncClose">&#1047;&#1072;&#1082;&#1088;&#1099;&#1090;&#1100;</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 const STORE_KEY = 'myday_board';
 
 const COLUMNS = [
-  { id: 'todo',  label: 'Надо сделать', color: '#6366f1' },
-  { id: 'doing', label: 'В процессе',   color: '#f59e0b' },
-  { id: 'done',  label: 'Готово',       color: '#22c55e' }
+  { id: 'todo',  label: '\u041d\u0430\u0434\u043e \u0441\u0434\u0435\u043b\u0430\u0442\u044c', color: '#6366f1' },
+  { id: 'doing', label: '\u0412 \u043f\u0440\u043e\u0446\u0435\u0441\u0441\u0435',   color: '#f59e0b' },
+  { id: 'done',  label: '\u0413\u043e\u0442\u043e\u0432\u043e',       color: '#22c55e' }
 ];
 
 const TAG_LABELS = {
-  work: 'Работа', personal: 'Личное',
-  health: 'Здоровье', home: 'Дом', other: ''
+  work: '\u0420\u0430\u0431\u043e\u0442\u0430', personal: '\u041b\u0438\u0447\u043d\u043e\u0435',
+  health: '\u0417\u0434\u043e\u0440\u043e\u0432\u044c\u0435', home: '\u0414\u043e\u043c', other: ''
 };
 
 let state = loadState();
 let editingId = null;
 let dragCardId = null;
-let placeholder = null;
 
 function loadState() {
   try {
@@ -508,6 +583,14 @@ function uid() {
 
 function cardsFor(colId) {
   return state.cards.filter(c => c.col === colId);
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
 }
 
 // ── Date badge ────────────────────────────────────────────────────────────
@@ -541,7 +624,7 @@ function buildColumn(col) {
         ${col.label}
         <span class="col-count">${cards.length}</span>
       </div>
-      <button class="col-add-btn" data-col="${col.id}" title="Добавить задачу">+</button>
+      <button class="col-add-btn" data-col="${col.id}" title="\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u0434\u0430\u0447\u0443">+</button>
     </div>
     <div class="cards-list" id="list-${col.id}"></div>
   `;
@@ -550,27 +633,51 @@ function buildColumn(col) {
 
   const list = wrap.querySelector('.cards-list');
   if (cards.length === 0) {
-    list.innerHTML = '<div class="empty-state">Нет задач</div>';
+    list.innerHTML = '<div class="empty-state">\u041d\u0435\u0442 \u0437\u0430\u0434\u0430\u0447</div>';
   } else {
-    cards.forEach((card, idx) => {
-      list.appendChild(buildCard(card, idx));
+    cards.forEach(card => {
+      list.appendChild(buildCard(card));
     });
   }
 
-  // Drop zone — entire column is a drop target
-  wrap.addEventListener('dragover', onDragOver);
-  wrap.addEventListener('dragleave', onDragLeave);
-  wrap.addEventListener('drop', e => onDrop(e, col.id));
+  // Drop zone — entire column
+  wrap.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Remove highlight from all columns, add to this one
+    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+    wrap.classList.add('drag-over');
+  });
+
+  wrap.addEventListener('dragleave', e => {
+    if (!wrap.contains(e.relatedTarget)) {
+      wrap.classList.remove('drag-over');
+    }
+  });
+
+  wrap.addEventListener('drop', e => {
+    e.preventDefault();
+    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+
+    const cardId = e.dataTransfer.getData('text/plain');
+    if (!cardId) return;
+
+    const card = state.cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    card.col = col.id;
+    saveState();
+    render();
+  });
 
   return wrap;
 }
 
-function buildCard(card, idx) {
+function buildCard(card) {
   const el = document.createElement('div');
   el.className = 'card';
   el.draggable = true;
   el.dataset.id = card.id;
-  el.dataset.idx = idx;
 
   const tagLabel = TAG_LABELS[card.tag] || '';
   const tagHtml = tagLabel
@@ -584,8 +691,8 @@ function buildCard(card, idx) {
     <div class="card-footer">
       ${tagHtml}
       <div class="card-actions">
-        <button class="card-btn edit" title="Редактировать">✏️</button>
-        <button class="card-btn del" title="Удалить">🗑</button>
+        <button class="card-btn edit" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c">\u270f\ufe0f</button>
+        <button class="card-btn del" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c">\ud83d\uddd1</button>
       </div>
     </div>
   `;
@@ -599,8 +706,20 @@ function buildCard(card, idx) {
     deleteCard(card.id);
   });
 
-  el.addEventListener('dragstart', e => onDragStart(e, card.id));
-  el.addEventListener('dragend', onDragEnd);
+  // Desktop drag
+  el.addEventListener('dragstart', e => {
+    dragCardId = card.id;
+    e.dataTransfer.setData('text/plain', card.id);
+    e.dataTransfer.effectAllowed = 'move';
+    // Use setTimeout so the drag image captures the card before we hide it
+    setTimeout(() => el.classList.add('dragging'), 0);
+  });
+
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+    dragCardId = null;
+  });
 
   return el;
 }
@@ -615,7 +734,7 @@ function openModal(cardId, defaultCol = 'todo') {
   editingId = cardId;
   const overlay = document.getElementById('modalOverlay');
   document.getElementById('modalTitle').textContent =
-    cardId ? 'Редактировать задачу' : 'Новая задача';
+    cardId ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0437\u0430\u0434\u0430\u0447\u0443' : '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u0434\u0430\u0447\u0430';
 
   if (cardId) {
     const c = state.cards.find(x => x.id === cardId);
@@ -675,67 +794,6 @@ function deleteCard(id) {
   render();
 }
 
-// ── Drag & Drop ───────────────────────────────────────────────────────────
-function onDragStart(e, cardId) {
-  dragCardId = cardId;
-  e.dataTransfer.setData('text/plain', cardId);
-  e.dataTransfer.effectAllowed = 'move';
-  requestAnimationFrame(() => {
-    e.target.classList.add('dragging');
-    document.getElementById('board').classList.add('dragging');
-  });
-}
-
-function onDragEnd(e) {
-  e.target.classList.remove('dragging');
-  document.getElementById('board').classList.remove('dragging');
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-  removePlaceholder();
-  dragCardId = null;
-}
-
-function onDragOver(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.dataTransfer.dropEffect = 'move';
-  // Highlight the column
-  const col = e.currentTarget.closest('.column') || e.currentTarget;
-  document.querySelectorAll('.column.drag-over').forEach(el => el.classList.remove('drag-over'));
-  col.classList.add('drag-over');
-}
-
-function onDragLeave(e) {
-  const col = e.currentTarget;
-  if (!col.contains(e.relatedTarget)) {
-    col.classList.remove('drag-over');
-  }
-}
-
-function onDrop(e, destColId) {
-  e.preventDefault();
-  e.stopPropagation();
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-  document.getElementById('board').classList.remove('dragging');
-  removePlaceholder();
-
-  const cardId = e.dataTransfer.getData('text/plain') || dragCardId;
-  if (!cardId) return;
-
-  const card = state.cards.find(c => c.id === cardId);
-  if (!card) return;
-
-  card.col = destColId;
-  dragCardId = null;
-
-  saveState();
-  render();
-}
-
-function removePlaceholder() {
-  if (placeholder && placeholder.parentNode) placeholder.remove();
-  placeholder = null;
-}
-
 // ── Touch drag for mobile ─────────────────────────────────────────────────
 let touchCardEl = null;
 let touchClone = null;
@@ -773,12 +831,11 @@ document.addEventListener('touchmove', e => {
     touchClone.style.top  = (t.clientY - 30) + 'px';
     touchClone.style.left = (t.clientX - 60) + 'px';
   }
-
   // Highlight target column
-  document.querySelectorAll('.cards-list').forEach(l => l.classList.remove('drag-over'));
+  document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
   const el = document.elementFromPoint(t.clientX, t.clientY);
-  const targetList = el && (el.closest('.cards-list') || el.closest('.column')?.querySelector('.cards-list'));
-  if (targetList) targetList.classList.add('drag-over');
+  const targetCol = el && el.closest('.column');
+  if (targetCol) targetCol.classList.add('drag-over');
 }, { passive: false });
 
 document.addEventListener('touchend', e => {
@@ -787,7 +844,7 @@ document.addEventListener('touchend', e => {
 
   const t = e.changedTouches[0];
   const el = document.elementFromPoint(t.clientX, t.clientY);
-  const colEl = el && (el.closest('.column'));
+  const colEl = el && el.closest('.column');
 
   touchCardEl.style.opacity = '';
   if (touchClone) touchClone.remove();
@@ -802,16 +859,69 @@ document.addEventListener('touchend', e => {
     }
   }
 
-  document.querySelectorAll('.drag-over').forEach(l => l.classList.remove('drag-over'));
+  document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
   touchCardEl = null;
   touchClone = null;
   touchCardId = null;
 });
 
+// ── Sync ──────────────────────────────────────────────────────────────────
+document.getElementById('syncBtn').addEventListener('click', () => {
+  const overlay = document.getElementById('syncOverlay');
+  // Pre-fill with current board data
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  document.getElementById('syncCode').value = code;
+  overlay.classList.add('open');
+});
+
+document.getElementById('syncClose').addEventListener('click', () => {
+  document.getElementById('syncOverlay').classList.remove('open');
+});
+
+document.getElementById('syncOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('syncOverlay')) {
+    document.getElementById('syncOverlay').classList.remove('open');
+  }
+});
+
+document.getElementById('syncCopy').addEventListener('click', () => {
+  const code = document.getElementById('syncCode').value;
+  navigator.clipboard.writeText(code).then(() => {
+    showToast('\u041a\u043e\u0434 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d!');
+  }).catch(() => {
+    document.getElementById('syncCode').select();
+    document.execCommand('copy');
+    showToast('\u041a\u043e\u0434 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d!');
+  });
+});
+
+document.getElementById('syncLoad').addEventListener('click', () => {
+  const code = document.getElementById('syncCode').value.trim();
+  if (!code) return;
+  try {
+    const data = JSON.parse(decodeURIComponent(escape(atob(code))));
+    if (data && data.cards) {
+      state = data;
+      saveState();
+      render();
+      document.getElementById('syncOverlay').classList.remove('open');
+      showToast('\u0417\u0430\u0434\u0430\u0447\u0438 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u044b!');
+    } else {
+      showToast('\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u043a\u043e\u0434');
+    }
+  } catch {
+    showToast('\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u043a\u043e\u0434');
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────
 render();
 
+// Unregister old service worker and register new one
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 </script>
