@@ -477,8 +477,7 @@ const TAG_LABELS = {
 
 let state = loadState();
 let editingId = null;
-let dragSrcCol = null;
-let dragSrcIdx = null;
+let dragCardId = null;
 let placeholder = null;
 
 function loadState() {
@@ -590,7 +589,7 @@ function buildCard(card, idx) {
     deleteCard(card.id);
   });
 
-  el.addEventListener('dragstart', e => onDragStart(e, card.col, idx));
+  el.addEventListener('dragstart', e => onDragStart(e, card.id));
   el.addEventListener('dragend', onDragEnd);
 
   return el;
@@ -667,37 +666,24 @@ function deleteCard(id) {
 }
 
 // ── Drag & Drop ───────────────────────────────────────────────────────────
-function onDragStart(e, colId, idx) {
-  dragSrcCol = colId;
-  dragSrcIdx = idx;
+function onDragStart(e, cardId) {
+  dragCardId = cardId;
+  e.dataTransfer.setData('text/plain', cardId);
   e.dataTransfer.effectAllowed = 'move';
-  e.currentTarget.classList.add('dragging');
+  requestAnimationFrame(() => e.target.classList.add('dragging'));
 }
 
 function onDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
   removePlaceholder();
+  dragCardId = null;
 }
 
 function onDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  const list = e.currentTarget;
-  list.classList.add('drag-over');
-
-  const afterEl = getDragAfterElement(list, e.clientY);
-  removePlaceholder();
-  placeholder = document.createElement('div');
-  placeholder.className = 'card drag-placeholder';
-
-  if (afterEl) {
-    list.insertBefore(placeholder, afterEl);
-  } else {
-    // Remove empty-state if present
-    const empty = list.querySelector('.empty-state');
-    if (empty) empty.remove();
-    list.appendChild(placeholder);
-  }
+  e.currentTarget.classList.add('drag-over');
 }
 
 function onDragLeave(e) {
@@ -708,56 +694,20 @@ function onDragLeave(e) {
 
 function onDrop(e, destColId) {
   e.preventDefault();
-  const list = e.currentTarget;
-  list.classList.remove('drag-over');
+  e.currentTarget.classList.remove('drag-over');
   removePlaceholder();
 
-  if (dragSrcCol === null) return;
+  const cardId = e.dataTransfer.getData('text/plain') || dragCardId;
+  if (!cardId) return;
 
-  const srcCards = cardsFor(dragSrcCol);
-  const card = srcCards[dragSrcIdx];
+  const card = state.cards.find(c => c.id === cardId);
   if (!card) return;
-
-  // Remove from source
-  state.cards = state.cards.filter(c => c.id !== card.id);
-
-  // Find drop position
-  const afterEl = getDragAfterElement(list, e.clientY);
-  let destIdx;
-  if (afterEl) {
-    const afterId = afterEl.dataset.id;
-    const destCards = cardsFor(destColId);
-    destIdx = destCards.findIndex(c => c.id === afterId);
-  } else {
-    destIdx = cardsFor(destColId).length;
-  }
 
   // Update column
   card.col = destColId;
 
-  // Insert at correct position in global array
-  const allDestCards = state.cards.filter(c => c.col === destColId);
-  const firstDestIdx = state.cards.findIndex(c => c.col === destColId);
-
-  if (firstDestIdx === -1) {
-    state.cards.push(card);
-  } else {
-    const insertPos = firstDestIdx + destIdx;
-    state.cards.splice(insertPos, 0, card);
-  }
-
   saveState();
   render();
-}
-
-function getDragAfterElement(list, y) {
-  const els = [...list.querySelectorAll('.card:not(.dragging):not(.drag-placeholder)')];
-  return els.reduce((closest, el) => {
-    const rect = el.getBoundingClientRect();
-    const offset = y - rect.top - rect.height / 2;
-    if (offset < 0 && offset > closest.offset) return { offset, el };
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY }).el;
 }
 
 function removePlaceholder() {
@@ -765,75 +715,76 @@ function removePlaceholder() {
   placeholder = null;
 }
 
-// ── Touch drag (basic support) ────────────────────────────────────────────
-// Long-press → move for mobile
-let touchCard = null;
+// ── Touch drag for mobile ─────────────────────────────────────────────────
+let touchCardEl = null;
 let touchClone = null;
-let touchStartX = 0, touchStartY = 0;
+let touchCardId = null;
+let touchTimer = null;
 
 document.addEventListener('touchstart', e => {
-  const card = e.target.closest('.card');
-  if (!card) return;
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
-  const timer = setTimeout(() => {
-    touchCard = card;
-    touchClone = card.cloneNode(true);
+  const cardEl = e.target.closest('.card');
+  if (!cardEl || e.target.closest('.card-btn')) return;
+
+  touchTimer = setTimeout(() => {
+    touchCardEl = cardEl;
+    touchCardId = cardEl.dataset.id;
+    touchClone = cardEl.cloneNode(true);
     touchClone.style.cssText = `
       position:fixed; z-index:999; opacity:0.85; pointer-events:none;
-      width:${card.offsetWidth}px; top:${card.getBoundingClientRect().top}px;
-      left:${card.getBoundingClientRect().left}px;
+      width:${cardEl.offsetWidth}px; top:${cardEl.getBoundingClientRect().top}px;
+      left:${cardEl.getBoundingClientRect().left}px;
       transform:rotate(2deg); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     `;
     document.body.appendChild(touchClone);
-    card.style.opacity = '0.3';
+    cardEl.style.opacity = '0.3';
+    if (navigator.vibrate) navigator.vibrate(30);
   }, 400);
-  card._touchTimer = timer;
 }, { passive: true });
 
 document.addEventListener('touchmove', e => {
-  const card = e.target.closest('.card');
-  if (card && card._touchTimer) { clearTimeout(card._touchTimer); }
-  if (!touchCard || !touchClone) return;
+  if (!touchCardEl) {
+    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+    return;
+  }
   e.preventDefault();
   const t = e.touches[0];
-  const rect = touchCard.getBoundingClientRect();
-  touchClone.style.top  = (t.clientY - rect.height / 2) + 'px';
-  touchClone.style.left = (t.clientX - rect.width / 2) + 'px';
+  if (touchClone) {
+    touchClone.style.top  = (t.clientY - 30) + 'px';
+    touchClone.style.left = (t.clientX - 60) + 'px';
+  }
+
+  // Highlight target column
+  document.querySelectorAll('.cards-list').forEach(l => l.classList.remove('drag-over'));
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const targetList = el && (el.closest('.cards-list') || el.closest('.column')?.querySelector('.cards-list'));
+  if (targetList) targetList.classList.add('drag-over');
 }, { passive: false });
 
 document.addEventListener('touchend', e => {
-  const card = e.target.closest('.card');
-  if (card && card._touchTimer) clearTimeout(card._touchTimer);
-  if (!touchCard || !touchClone) return;
+  if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+  if (!touchCardEl || !touchCardId) return;
 
   const t = e.changedTouches[0];
   const el = document.elementFromPoint(t.clientX, t.clientY);
-  const destList = el && el.closest('.cards-list');
+  const colEl = el && (el.closest('.column'));
 
-  touchCard.style.opacity = '';
-  touchClone.remove();
+  touchCardEl.style.opacity = '';
+  if (touchClone) touchClone.remove();
 
-  if (destList) {
-    const colEl = destList.closest('.column');
-    const destColId = colEl && colEl.dataset.col;
-    if (destColId) {
-      const srcColId = touchCard.closest('.column').dataset.col;
-      const srcIdx = parseInt(touchCard.dataset.idx, 10);
-      const srcCards = cardsFor(srcColId);
-      const card = srcCards[srcIdx];
-      if (card) {
-        state.cards = state.cards.filter(c => c.id !== card.id);
-        card.col = destColId;
-        state.cards.push(card);
-        saveState();
-        render();
-      }
+  if (colEl) {
+    const destColId = colEl.dataset.col;
+    const card = state.cards.find(c => c.id === touchCardId);
+    if (card && destColId) {
+      card.col = destColId;
+      saveState();
+      render();
     }
   }
 
-  touchCard = null;
+  document.querySelectorAll('.drag-over').forEach(l => l.classList.remove('drag-over'));
+  touchCardEl = null;
   touchClone = null;
+  touchCardId = null;
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
